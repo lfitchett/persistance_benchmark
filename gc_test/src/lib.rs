@@ -14,16 +14,16 @@ use std::*;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Publish {
-    packet_id: u16,
-    retain: bool,
-    topic_name: String,
-    payload: Payload,
+    pub packet_id: u16,
+    pub retain: bool,
+    pub topic_name: String,
+    pub payload: Payload,
 }
 
 #[derive(Debug, Eq, PartialEq)]
 pub struct Payload {
-    bytes: Arc<Vec<u8>>,
-    id: u64,
+    pub bytes: Arc<Vec<u8>>,
+    pub id: u64,
 }
 
 impl Clone for Payload {
