@@ -12,28 +12,7 @@ use std::path::*;
 use std::sync::*;
 use std::*;
 
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct Publish {
-    pub packet_id: u16,
-    pub retain: bool,
-    pub topic_name: String,
-    pub payload: Payload,
-}
-
-#[derive(Debug, Eq, PartialEq)]
-pub struct Payload {
-    pub bytes: Arc<Vec<u8>>,
-    pub id: u64,
-}
-
-impl Clone for Payload {
-    fn clone(&self) -> Self {
-        Payload {
-            id: self.id,
-            bytes: self.bytes.clone(),
-        }
-    }
-}
+use shared_lib::*;
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 struct DiskPublish {
@@ -47,6 +26,42 @@ pub struct DB {
     payloads: PathBuf,
     sessions: PathBuf,
     loaded_payloads: HashMap<u64, Weak<Vec<u8>>>,
+}
+
+impl Storage for DB {
+    fn write(&mut self, session_id: &str, publishes: &[Publish]) -> Result<(), Box<dyn Error>> {
+        for publish in publishes {
+            let payload = publish.payload.clone();
+
+            let body = DiskPublish {
+                packet_id: publish.packet_id,
+                retain: publish.retain,
+                topic_name: publish.topic_name.clone(),
+                payload_id: payload.id,
+            };
+
+            self.write_body(session_id, body)?;
+            self.write_payload_if_empty(payload)?;
+        }
+        Ok(())
+    }
+
+    fn read(&mut self, session_id: &str) -> Result<Vec<Publish>, Box<dyn Error>> {
+        let session_root = self.sessions.join(session_id);
+        if !session_root.exists() {
+            return Ok(Vec::new());
+        }
+
+        let messages = session_root.join("Messages");
+
+        let result = fs::read_dir(messages)?
+            .filter_map(|f| if let Ok(f) = f { Some(f.path()) } else { None })
+            .map(|p| self.parse_body(&p))
+            .filter_map(|p| if let Ok(p) = p { Some(p) } else { None })
+            .collect();
+
+        Ok(result)
+    }
 }
 
 impl DB {
@@ -65,39 +80,6 @@ impl DB {
             sessions,
             loaded_payloads: HashMap::new(),
         })
-    }
-
-    pub fn write(&mut self, session_id: &str, publish: Publish) -> Result<(), Box<dyn Error>> {
-        let payload = publish.payload;
-
-        let body = DiskPublish {
-            packet_id: publish.packet_id,
-            retain: publish.retain,
-            topic_name: publish.topic_name,
-            payload_id: payload.id,
-        };
-
-        self.write_body(session_id, body)?;
-        self.write_payload_if_empty(payload)?;
-
-        Ok(())
-    }
-
-    pub fn read(&mut self, session_id: &str) -> Result<Vec<Publish>, Box<dyn Error>> {
-        let session_root = self.sessions.join(session_id);
-        if !session_root.exists() {
-            return Ok(Vec::new());
-        }
-
-        let messages = session_root.join("Messages");
-
-        let result = fs::read_dir(messages)?
-            .filter_map(|f| if let Ok(f) = f { Some(f.path()) } else { None })
-            .map(|p| self.parse_body(&p))
-            .filter_map(|p| if let Ok(p) = p { Some(p) } else { None })
-            .collect();
-
-        Ok(result)
     }
 
     pub fn clean(&mut self) -> Result<(), Box<dyn Error>> {

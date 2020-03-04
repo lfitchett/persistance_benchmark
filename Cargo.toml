@@ -9,6 +9,7 @@ edition = "2018"
 [dependencies]
 gc_test = {path = "./gc_test"}
 load_consolidate_test = {path = "./load_consolidate_test"}
+shared_lib = {path = "./shared_lib"}
 
 [dev-dependencies]
 criterion = "0.3"

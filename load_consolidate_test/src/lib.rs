@@ -1,42 +1,27 @@
 #![allow(dead_code)]
 #![allow(unused_imports)]
 
-use bytes::*;
 use serde_derive::{Deserialize, Serialize};
+use std::collections::hash_map::DefaultHasher;
 use std::collections::*;
 use std::error::Error;
 use std::fs::*;
+use std::hash::{Hash, Hasher};
 use std::io::prelude::*;
 use std::iter::*;
 use std::path::*;
 use std::sync::*;
 use std::*;
 
-use std::collections::hash_map::DefaultHasher;
-use std::hash::{Hash, Hasher};
-
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
-pub struct Publish {
-    pub packet_id: u16,
-    pub retain: bool,
-    pub topic_name: String,
-    pub payload: Arc<Vec<u8>>,
-}
+use shared_lib::*;
 
 pub struct DB {
     loaded_payloads: HashMap<u64, Weak<Vec<u8>>>,
     location: PathBuf,
 }
 
-impl DB {
-    pub fn new(location: &Path) -> Self {
-        Self {
-            location: location.to_owned(),
-            loaded_payloads: HashMap::new(),
-        }
-    }
-
-    pub fn write(&mut self, session_id: &str, publish: &[Publish]) -> Result<(), Box<dyn Error>> {
+impl Storage for DB {
+    fn write(&mut self, session_id: &str, publish: &[Publish]) -> Result<(), Box<dyn Error>> {
         let bytes = bincode::serialize(publish)?;
 
         OpenOptions::new()
@@ -49,7 +34,7 @@ impl DB {
         Ok(())
     }
 
-    pub fn read(&mut self, session_id: &str) -> Result<Vec<Publish>, Box<dyn Error>> {
+    fn read(&mut self, session_id: &str) -> Result<Vec<Publish>, Box<dyn Error>> {
         let mut publishes: Vec<Publish> =
             bincode::deserialize_from(File::open(self.location.join(session_id))?)?;
 
@@ -70,6 +55,15 @@ impl DB {
         }
 
         Ok(publishes)
+    }
+}
+
+impl DB {
+    pub fn new(location: &Path) -> Self {
+        Self {
+            location: location.to_owned(),
+            loaded_payloads: HashMap::new(),
+        }
     }
 
     fn calculate_hash<T: Hash>(t: &T) -> u64 {
