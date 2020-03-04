@@ -1,0 +1,17 @@
+[package]
+name = "gc_test"
+version = "0.1.0"
+authors = ["Lee Fitchett <lefitche@microsoft.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+bytes = "0.5.4"
+bincode = "1.2.1"
+serde = "1.0"
+serde_derive = "1.0"
+serde_json = "1.0"
+
+[dev-dependencies]
+tempfile = "3.1.0"
