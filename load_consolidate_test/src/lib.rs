@@ -17,10 +17,10 @@ use std::hash::{Hash, Hasher};
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct Publish {
-    packet_id: u16,
-    retain: bool,
-    topic_name: String,
-    payload: Arc<Vec<u8>>,
+    pub packet_id: u16,
+    pub retain: bool,
+    pub topic_name: String,
+    pub payload: Arc<Vec<u8>>,
 }
 
 pub struct DB {
