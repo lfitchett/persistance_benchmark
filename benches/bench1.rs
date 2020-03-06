@@ -1,142 +1,138 @@
+use std::any::type_name;
+use std::path::Path;
 use std::sync::*;
 
 use criterion::*;
 use tempfile::tempdir;
 
 use gc_test::DB as GcDB;
-use load_consolidate_test::DB as LcGC;
+use load_consolidate_test::DB as LcDB;
 use shared_lib::*;
 
-fn gc_read_write_single(c: &mut Criterion) {
-    c.bench_function("gc_read_write_single", |b| {
+fn test_write<S, F>(c: &mut Criterion, get_db: F, num_messages: u8, num_sessions: u8)
+where
+    S: Storage,
+    F: Fn(&Path) -> S,
+{
+    let name = format!(
+        "{}: write {} messages for {} sessions",
+        type_name::<S>(),
+        num_messages,
+        num_sessions
+    );
+
+    c.bench_function(&name, |b| {
         b.iter_batched(
             || {
                 let dir = tempdir().unwrap();
-                let db = GcDB::new(dir.as_ref()).expect("Make db");
-                let data = Faker::new().make_publishes(&[vec![1, 2, 3, 4, 5]]);
+                let db = get_db(dir.as_ref());
+
+                let raw_data: Vec<Vec<u8>> = (0..num_messages).map(|i| (0..i).collect()).collect();
+                let publishes = Faker::new().make_publishes(&raw_data);
+                let data = (0..num_sessions).map(move |i| {
+                    (
+                        format!("Session {}", i),
+                        publishes.clone(),
+                    )
+                });
 
                 (dir, db, data)
             },
             |(_dir, mut db, data)| {
-                db.write("Session 1", &data).expect("Publish 1");
-
-                let stored = db.read("Session 1").unwrap();
-
-                assert_eq!(stored.len(), 1);
-                assert_eq!(stored[0].topic_name, "fake");
-                assert_eq!(stored[0].payload.bytes, Arc::new(vec![1, 2, 3, 4, 5]));
+                for (session, messages) in data {
+                    db.write(&session, &messages).expect("Publish 1");
+                }
             },
             BatchSize::SmallInput,
         );
     });
 }
 
-fn gc_read_write_many_small_payload(c: &mut Criterion) {
-    c.bench_function("gc_read_write_many_small_payload", |b| {
+fn test_read<S, F>(c: &mut Criterion, get_db: F, num_messages: u8, num_sessions: u8)
+where
+    S: Storage,
+    F: Fn(&Path) -> S,
+{
+    let name = format!(
+        "{}: read {} messages for {} sessions",
+        type_name::<S>(),
+        num_messages,
+        num_sessions
+    );
+    c.bench_function(&name, |b| {
         b.iter_batched(
             || {
                 let dir = tempdir().unwrap();
-                let db = GcDB::new(dir.as_ref()).expect("Make db");
+                let mut db = get_db(dir.as_ref());
 
-                let payloads: Vec<Vec<u8>> = (0..5).map(|i| vec![i]).collect();
-                let data = Faker::new().make_publishes(&payloads);
+                let raw_data: Vec<Vec<u8>> = (0..num_messages).map(|i| (0..i).collect()).collect();
+                let publishes = Faker::new().make_publishes(&raw_data);
 
-                (dir, db, data)
-            },
-            |(_dir, mut db, data)| {
-                db.write("Session 1", &data).expect("Publish 1");
-                db.read("Session 1").unwrap()
-            },
-            BatchSize::SmallInput,
-        );
-    });
-}
-
-fn lc_read_write_single(c: &mut Criterion) {
-    c.bench_function("lc_read_write_single", |b| {
-        b.iter_batched(
-            || {
-                let dir = tempdir().unwrap();
-                let db = LcGC::new(dir.as_ref());
-                let data = Faker::new().make_publishes(&[vec![1, 2, 3, 4, 5]]);
-
-                (dir, db, data)
-            },
-            |(_dir, mut db, data)| {
-                db.write("Session 1", &data).expect("Publish 1");
-
-                let stored = db.read("Session 1").unwrap();
-
-                assert_eq!(stored.len(), 1);
-                assert_eq!(stored[0].topic_name, "fake");
-                assert_eq!(stored[0].payload.bytes, Arc::new(vec![1, 2, 3, 4, 5]));
-            },
-            BatchSize::SmallInput,
-        );
-    });
-}
-
-fn lc_read_write_many_small_payload(c: &mut Criterion) {
-    c.bench_function("lc_read_write_many_small_payload", |b| {
-        b.iter_batched(
-            || {
-                let dir = tempdir().unwrap();
-                let db = LcGC::new(dir.as_ref());
-
-                let payloads: Vec<Vec<u8>> = (0..100).map(|i| vec![i]).collect();
-                let data = Faker::new().make_publishes(&payloads);
-
-                (dir, db, data)
-            },
-            |(_dir, mut db, data)| {
-                db.write("Session 1", &data).expect("Publish 1");
-                db.read("Session 1").unwrap()
-            },
-            BatchSize::SmallInput,
-        );
-    });
-}
-
-fn lc_read_write_many_small_payload_many_session(c: &mut Criterion) {
-    c.bench_function("lc_read_write_many_small_payload_many_session", |b| {
-        b.iter_batched(
-            || {
-                let dir = tempdir().unwrap();
-                let db = LcGC::new(dir.as_ref());
-
-                let payloads: Vec<Vec<u8>> = (0..100).map(|i| vec![i]).collect();
-                let data = Faker::new().make_publishes(&payloads);
-
-                (dir, db, data)
-            },
-            |(_dir, mut db, data)| {
-                let mut test = Vec::with_capacity(10);
-
-                for i in 0..5 {
-                    let name = format!("Session {}", i);
-                    db.write(&name, &data).expect("Publish 1");
-                    let result = db.read(&name).unwrap();
-
-                    test.push(result);
+                let sessions: Vec<String> = (0..num_sessions)
+                    .map(|i| format!("Session {}", i))
+                    .collect();
+                for session in &sessions {
+                    db.write(&session, &publishes).expect("Publish 1");
                 }
 
-                test
+                (dir, db, sessions)
+            },
+            |(_dir, mut db, sessions)| {
+                for session in sessions {
+                    black_box(db.read(&session)).unwrap();
+                }
             },
             BatchSize::SmallInput,
         );
     });
 }
+
+fn lc_write_single(c: &mut Criterion) {
+    test_write(c, LcDB::new, 1, 1)
+}
+
+fn gc_write_single(c: &mut Criterion) {
+    test_write(c, |p| GcDB::new(p).expect("Make db"), 1, 1)
+}
+
+fn lc_read_single(c: &mut Criterion) {
+    test_read(c, LcDB::new, 1, 1)
+}
+
+fn lc_write_many(c: &mut Criterion) {
+    test_write(c, LcDB::new, 100, 1)
+}
+
+fn lc_read_many(c: &mut Criterion) {
+    test_read(c, LcDB::new, 100, 1)
+}
+
+fn gc_read_single(c: &mut Criterion) {
+    test_read(c, |p| GcDB::new(p).expect("Make db"), 1, 1)
+}
+
+fn gc_write_many(c: &mut Criterion) {
+    test_write(c, |p| GcDB::new(p).expect("Make db"), 100, 1)
+}
+
+fn gc_read_many(c: &mut Criterion) {
+    test_read(c, |p| GcDB::new(p).expect("Make db"), 100, 1)
+}
+
+criterion_group!(
+    load_consolidation,
+    lc_read_single,
+    lc_write_single,
+    lc_read_many,
+    lc_write_many
+);
 
 criterion_group!(
     garbage_collection,
-    gc_read_write_single,
-    gc_read_write_many_small_payload
-);
-criterion_group!(
-    load_consolidation,
-    lc_read_write_single,
-    lc_read_write_many_small_payload,
-    lc_read_write_many_small_payload_many_session
+    gc_read_single,
+    gc_write_single,
+    gc_read_many,
+    gc_write_many
 );
 
 // criterion_main!(garbage_collection, load_consolidation);
