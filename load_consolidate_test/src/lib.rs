@@ -39,19 +39,15 @@ impl Storage for DB {
             bincode::deserialize_from(File::open(self.location.join(session_id))?)?;
 
         for mut publish in publishes.iter_mut() {
-            let hash = Self::calculate_hash(&publish.payload);
-            if let Some(payload) = self.loaded_payloads.get(&hash) {
+            if let Some(payload) = self.loaded_payloads.get(&publish.payload.id) {
                 if let Some(payload) = payload.upgrade() {
-                    // Hash collision
-                    if publish.payload == payload {
-                        publish.payload = payload;
-                        continue;
-                    }
+                    publish.payload.bytes = payload;
+                    continue;
                 }
             }
 
             self.loaded_payloads
-                .insert(hash, Arc::downgrade(&publish.payload));
+                .insert(publish.payload.id, Arc::downgrade(&publish.payload.bytes));
         }
 
         Ok(publishes)

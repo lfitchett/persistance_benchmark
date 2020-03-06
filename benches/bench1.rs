@@ -3,8 +3,9 @@ use std::sync::*;
 use criterion::*;
 use tempfile::tempdir;
 
-use gc_test::{Payload as GcPayload, Publish as GcPublish, DB as GcDB};
-use load_consolidate_test::{Publish as LcPublish, DB as LcGC};
+use gc_test::DB as GcDB;
+use load_consolidate_test::DB as LcGC;
+use shared_lib::*;
 
 fn gc_read_write_single(c: &mut Criterion) {
     c.bench_function("gc_read_write_single", |b| {
@@ -12,7 +13,7 @@ fn gc_read_write_single(c: &mut Criterion) {
             || {
                 let dir = tempdir().unwrap();
                 let db = GcDB::new(dir.as_ref()).expect("Make db");
-                let data = Faker::new().gc_publish(&[vec![1, 2, 3, 4, 5]]);
+                let data = Faker::new().make_publishes(&[vec![1, 2, 3, 4, 5]]);
 
                 (dir, db, data)
             },
@@ -38,7 +39,7 @@ fn gc_read_write_many_small_payload(c: &mut Criterion) {
                 let db = GcDB::new(dir.as_ref()).expect("Make db");
 
                 let payloads: Vec<Vec<u8>> = (0..5).map(|i| vec![i]).collect();
-                let data = Faker::new().gc_publish(&payloads);
+                let data = Faker::new().make_publishes(&payloads);
 
                 (dir, db, data)
             },
@@ -57,7 +58,7 @@ fn lc_read_write_single(c: &mut Criterion) {
             || {
                 let dir = tempdir().unwrap();
                 let db = LcGC::new(dir.as_ref());
-                let data = Faker::new().lc_publish(&[vec![1, 2, 3, 4, 5]]);
+                let data = Faker::new().make_publishes(&[vec![1, 2, 3, 4, 5]]);
 
                 (dir, db, data)
             },
@@ -68,7 +69,7 @@ fn lc_read_write_single(c: &mut Criterion) {
 
                 assert_eq!(stored.len(), 1);
                 assert_eq!(stored[0].topic_name, "fake");
-                assert_eq!(stored[0].payload, Arc::new(vec![1, 2, 3, 4, 5]));
+                assert_eq!(stored[0].payload.bytes, Arc::new(vec![1, 2, 3, 4, 5]));
             },
             BatchSize::SmallInput,
         );
@@ -83,7 +84,7 @@ fn lc_read_write_many_small_payload(c: &mut Criterion) {
                 let db = LcGC::new(dir.as_ref());
 
                 let payloads: Vec<Vec<u8>> = (0..100).map(|i| vec![i]).collect();
-                let data = Faker::new().lc_publish(&payloads);
+                let data = Faker::new().make_publishes(&payloads);
 
                 (dir, db, data)
             },
@@ -104,7 +105,7 @@ fn lc_read_write_many_small_payload_many_session(c: &mut Criterion) {
                 let db = LcGC::new(dir.as_ref());
 
                 let payloads: Vec<Vec<u8>> = (0..100).map(|i| vec![i]).collect();
-                let data = Faker::new().lc_publish(&payloads);
+                let data = Faker::new().make_publishes(&payloads);
 
                 (dir, db, data)
             },
@@ -154,36 +155,19 @@ impl Faker {
         }
     }
 
-    fn gc_publish(&mut self, payloads: &[Vec<u8>]) -> Vec<GcPublish> {
+    fn make_publishes(&mut self, payloads: &[Vec<u8>]) -> Vec<Publish> {
         payloads
             .iter()
             .map(|payload| {
                 self.packet_id += 2;
                 self.payload_id += 1;
 
-                GcPublish {
+                Publish {
                     packet_id: self.packet_id,
-                    payload: GcPayload {
+                    payload: Payload {
                         id: self.payload_id,
                         bytes: Arc::new(payload.clone()),
                     },
-                    retain: true,
-                    topic_name: "fake".to_owned(),
-                }
-            })
-            .collect()
-    }
-
-    fn lc_publish(&mut self, payloads: &[Vec<u8>]) -> Vec<LcPublish> {
-        payloads
-            .iter()
-            .map(|payload| {
-                self.packet_id += 2;
-                self.payload_id += 1;
-
-                LcPublish {
-                    packet_id: self.packet_id,
-                    payload: Arc::new(payload.clone()),
                     retain: true,
                     topic_name: "fake".to_owned(),
                 }
