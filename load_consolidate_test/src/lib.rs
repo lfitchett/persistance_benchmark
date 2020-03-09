@@ -15,12 +15,12 @@ use std::*;
 
 use shared_lib::*;
 
-pub struct DB {
+pub struct LoadConsolidateStorage {
     loaded_payloads: HashMap<u64, Weak<Vec<u8>>>,
     location: PathBuf,
 }
 
-impl Storage for DB {
+impl Storage for LoadConsolidateStorage {
     fn write(&mut self, session_id: &str, publish: &[Publish]) -> Result<(), Box<dyn Error>> {
         let bytes = bincode::serialize(publish)?;
 
@@ -54,7 +54,7 @@ impl Storage for DB {
     }
 }
 
-impl DB {
+impl LoadConsolidateStorage {
     pub fn new(location: &Path) -> Self {
         Self {
             location: location.to_owned(),
@@ -77,7 +77,7 @@ mod tests {
     #[test]
     fn test_read_write() {
         let path = tempdir().unwrap().into_path();
-        let mut db = DB::new(&path);
+        let mut db = LoadConsolidateStorage::new(&path);
         let mut faker = Faker::new();
 
         let publish = faker.make_fake_publish(vec![1, 2, 3, 4, 5]);
@@ -92,7 +92,7 @@ mod tests {
     #[test]
     fn test_dedupe() {
         let path = tempdir().unwrap().into_path();
-        let mut db = DB::new(&path);
+        let mut db = LoadConsolidateStorage::new(&path);
         let mut faker = Faker::new();
 
         let publish = faker.make_fake_publish(vec![1, 2, 3, 4, 5]);

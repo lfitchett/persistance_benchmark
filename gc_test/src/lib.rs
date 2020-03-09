@@ -22,13 +22,13 @@ struct DiskPublish {
     payload_id: u64,
 }
 
-pub struct DB {
+pub struct GCStorage {
     payloads: PathBuf,
     sessions: PathBuf,
     loaded_payloads: HashMap<u64, Weak<Vec<u8>>>,
 }
 
-impl Storage for DB {
+impl Storage for GCStorage {
     fn write(&mut self, session_id: &str, publishes: &[Publish]) -> Result<(), Box<dyn Error>> {
         for publish in publishes {
             let payload = publish.payload.clone();
@@ -64,7 +64,7 @@ impl Storage for DB {
     }
 }
 
-impl DB {
+impl GCStorage {
     pub fn new(location: &Path) -> Result<Self, Box<dyn Error>> {
         let payloads = location.join("Payloads");
         let sessions = location.join("Sessions");
@@ -75,7 +75,7 @@ impl DB {
         if !sessions.exists() {
             create_dir(&sessions)?;
         }
-        Ok(DB {
+        Ok(GCStorage {
             payloads,
             sessions,
             loaded_payloads: HashMap::new(),
@@ -226,7 +226,7 @@ mod tests {
     #[test]
     fn test_clean() {
         let path = tempdir().unwrap().into_path();
-        let mut db = DB::new(&path).expect("Make db");
+        let mut db = GCStorage::new(&path).expect("Make db");
         let mut faker = Faker::new();
 
         let publish = faker.make_fake_publish(vec![1, 2, 3, 4, 5]);
@@ -261,7 +261,7 @@ mod tests {
     #[test]
     fn test_read_write() {
         let path = tempdir().unwrap().into_path();
-        let mut db = DB::new(&path).expect("Make db");
+        let mut db = GCStorage::new(&path).expect("Make db");
         let mut faker = Faker::new();
 
         db.write("Session 1", faker.make_fake_publish(vec![1, 2, 3, 4, 5]))
@@ -276,7 +276,7 @@ mod tests {
     #[test]
     fn test_read_write_multiple() {
         let path = tempdir().unwrap().into_path();
-        let mut db = DB::new(&path).expect("Make db");
+        let mut db = GCStorage::new(&path).expect("Make db");
         let mut faker = Faker::new();
 
         db.write("Session 1", faker.make_fake_publish(vec![1, 2, 3]))
@@ -297,7 +297,7 @@ mod tests {
     #[test]
     fn test_shared_payload() {
         let path = tempdir().unwrap().into_path();
-        let mut db = DB::new(&path).expect("Make db");
+        let mut db = GCStorage::new(&path).expect("Make db");
         let mut faker = Faker::new();
 
         let publish = faker.make_fake_publish(vec![1, 2, 3, 4, 5]);
@@ -318,7 +318,7 @@ mod tests {
     #[test]
     fn test_shared_payload_in_memory() {
         let path = tempdir().unwrap().into_path();
-        let mut db = DB::new(&path).expect("Make db");
+        let mut db = GCStorage::new(&path).expect("Make db");
         let mut faker = Faker::new();
 
         let publish = faker.make_fake_publish(vec![1, 2, 3, 4, 5]);
@@ -343,7 +343,7 @@ mod tests {
     #[test]
     fn test_add_remove_payload() {
         let path = tempdir().unwrap().into_path();
-        let mut db = DB::new(&path).expect("Make db");
+        let mut db = GCStorage::new(&path).expect("Make db");
         let mut faker = Faker::new();
 
         let publish = faker.make_fake_publish(vec![1, 2, 3, 4, 5]);
@@ -364,7 +364,7 @@ mod tests {
     #[test]
     fn test_get_session_ids() {
         let path = tempdir().unwrap().into_path();
-        let mut db = DB::new(&path).expect("Make db");
+        let mut db = GCStorage::new(&path).expect("Make db");
         let mut faker = Faker::new();
 
         let publish = faker.make_fake_publish(vec![1, 2, 3, 4, 5]);
@@ -380,7 +380,7 @@ mod tests {
     #[test]
     fn test_get_session_payload_ids() {
         let path = tempdir().unwrap().into_path();
-        let mut db = DB::new(&path).expect("Make db");
+        let mut db = GCStorage::new(&path).expect("Make db");
         let mut faker = Faker::new();
 
         let publish = faker.make_fake_publish(vec![1, 2, 3, 4, 5]);
@@ -395,7 +395,7 @@ mod tests {
     #[test]
     fn test_get_payload_ids() {
         let path = tempdir().unwrap().into_path();
-        let mut db = DB::new(&path).expect("Make db");
+        let mut db = GCStorage::new(&path).expect("Make db");
         let mut faker = Faker::new();
 
         let publish = faker.make_fake_publish(vec![1, 2, 3, 4, 5]);

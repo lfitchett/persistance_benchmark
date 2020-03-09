@@ -5,8 +5,8 @@ use std::sync::*;
 use criterion::*;
 use tempfile::tempdir;
 
-use gc_test::DB as GcDB;
-use load_consolidate_test::DB as LcDB;
+use gc_test::GCStorage;
+use load_consolidate_test::LoadConsolidateStorage;
 use shared_lib::*;
 
 fn test_write<S, F>(c: &mut Criterion, get_db: F, num_messages: u8, num_sessions: u8)
@@ -88,35 +88,35 @@ where
 }
 
 fn lc_write_single(c: &mut Criterion) {
-    test_write(c, LcDB::new, 1, 1)
+    test_write(c, LoadConsolidateStorage::new, 1, 1)
 }
 
 fn gc_write_single(c: &mut Criterion) {
-    test_write(c, |p| GcDB::new(p).expect("Make db"), 1, 1)
+    test_write(c, |p| GCStorage::new(p).expect("Make db"), 1, 1)
 }
 
 fn lc_read_single(c: &mut Criterion) {
-    test_read(c, LcDB::new, 1, 1)
+    test_read(c, LoadConsolidateStorage::new, 1, 1)
 }
 
 fn lc_write_many(c: &mut Criterion) {
-    test_write(c, LcDB::new, 100, 1)
+    test_write(c, LoadConsolidateStorage::new, 100, 1)
 }
 
 fn lc_read_many(c: &mut Criterion) {
-    test_read(c, LcDB::new, 100, 1)
+    test_read(c, LoadConsolidateStorage::new, 100, 1)
 }
 
 fn gc_read_single(c: &mut Criterion) {
-    test_read(c, |p| GcDB::new(p).expect("Make db"), 1, 1)
+    test_read(c, |p| GCStorage::new(p).expect("Make db"), 1, 1)
 }
 
 fn gc_write_many(c: &mut Criterion) {
-    test_write(c, |p| GcDB::new(p).expect("Make db"), 100, 1)
+    test_write(c, |p| GCStorage::new(p).expect("Make db"), 100, 1)
 }
 
 fn gc_read_many(c: &mut Criterion) {
-    test_read(c, |p| GcDB::new(p).expect("Make db"), 100, 1)
+    test_read(c, |p| GCStorage::new(p).expect("Make db"), 100, 1)
 }
 
 criterion_group!(
