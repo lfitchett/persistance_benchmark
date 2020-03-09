@@ -64,7 +64,44 @@ impl Storage for GCStorage {
     }
 
     fn read(&mut self, session_id: &str) -> Result<Vec<Publish>, Box<dyn Error>> {
-        Ok(vec![])
+        let bodies: Vec<u8> = self
+            .db
+            .get_cf(
+                self.db
+                    .cf_handle("Messages")
+                    .expect("Messages should exist"),
+                session_id,
+            )?
+            .unwrap_or_default();
+
+        let bodies: Vec<DiskPublish> = bincode::deserialize_from(&bodies[..])?;
+
+        let payloads_cf = self
+            .db
+            .cf_handle("Payloads")
+            .expect("Payloads should exist");
+        let result: Vec<Publish> = bodies
+            .iter()
+            .map(|body| {
+                let payload: Vec<u8> = self
+                    .db
+                    .get_cf(payloads_cf, body.payload_id.to_ne_bytes())
+                    .unwrap()
+                    .unwrap();
+
+                Publish {
+                    packet_id: body.packet_id,
+                    retain: body.retain,
+                    topic_name: body.topic_name.clone(),
+                    payload: Payload {
+                        id: body.payload_id,
+                        bytes: Arc::new(payload),
+                    },
+                }
+            })
+            .collect();
+
+        Ok(result)
     }
 }
 
