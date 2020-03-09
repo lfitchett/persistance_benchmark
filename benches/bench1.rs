@@ -135,8 +135,8 @@ criterion_group!(
     gc_write_many
 );
 
-// criterion_main!(garbage_collection, load_consolidation);
-criterion_main!(load_consolidation);
+criterion_main!(garbage_collection, load_consolidation);
+// criterion_main!(load_consolidation);
 
 struct Faker {
     packet_id: u16,

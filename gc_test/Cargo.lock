@@ -46,6 +46,7 @@ dependencies = [
  "serde",
  "serde_derive",
  "serde_json",
+ "shared_lib",
  "tempfile",
 ]
 
@@ -184,6 +185,15 @@ dependencies = [
  "itoa",
  "ryu",
  "serde",
+]
+
+[[package]]
+name = "shared_lib"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_derive",
+ "serde_json",
 ]
 
 [[package]]
